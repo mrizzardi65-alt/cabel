@@ -4,7 +4,7 @@
   "warehouse": "bigquery",
   "defaultDatabase": "ornate-crossbar-499808-h8",
   "vars": {
-    "dat_caricamento": "FORMAT_DATE('%d/%m/%Y', CURRENT_DATE())",
-    "dat_sched_tws": "FORMAT_DATE('%d/%m/%Y', CURRENT_DATE())"
+    "dat_caricamento": "01/01/2025",
+    "dat_sched_tws": "01/01/2025"
   }
 }
