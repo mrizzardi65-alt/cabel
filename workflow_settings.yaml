@@ -1,0 +1,8 @@
+defaultProject: ornate-crossbar-499808-h8
+defaultDataset: dataform
+defaultAssertionDataset: dataform_assertions
+dataformCoreVersion: 3.0.52
+
+"vars": {
+  "V_DAT_CARICAMENTO": "2026-07-02"
+}
