@@ -85,11 +85,11 @@ END)	FLG_OPERATIVA,
 	S_AGENZIA.COD_CIN	COD_CIN,
 	S_AGENZIA.COD_CAB_COMUNE	COD_CAB_COMUNE,
 	S_AGENZIA.COD_CIN_COMUNE	COD_CIN_COMUNE,
-        PARSE_DATE('%Y%m%d', '${vars.dat_sched_tws}') DAT_INIZIO_VALIDITA,
+        PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}') DAT_INIZIO_VALIDITA,
         PARSE_DATE('%Y%m%d', '24000101') DAT_FINE_VALIDITA,
         'I' IND_UPDATE
 from	${ref("h_agenzia")} /* datavault */ H_AGENZIA  INNER JOIN  ${ref("s_agenzia")} /* datavault */ S_AGENZIA
     ON  H_AGENZIA.SEQ_AGENZIA = S_AGENZIA.SEQ_AGENZIA
 where	(1=1)
- and (PARSE_DATE('%Y%m%d', '${vars.dat_sched_tws}') BETWEEN S_AGENZIA.DAT_INIZIO_VALIDITA
+ and (PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}') BETWEEN S_AGENZIA.DAT_INIZIO_VALIDITA
                                                   AND S_AGENZIA.DAT_FINE_VALIDITA)

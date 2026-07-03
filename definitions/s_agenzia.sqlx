@@ -59,7 +59,7 @@ Drop Table `datavault.s_agenzia`_DR
   -- [Update Table Deleted Records]
 Update `datavault.s_agenzia`_DR T
 Set FLG_CURRENT = 1,
-    DAT_INIZIO_VALIDITA = PARSE_DATE('%d/%m/%Y', '${vars.dat_caricamento}')-1,
+    DAT_INIZIO_VALIDITA = PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}')-1,
     DAT_FINE_VALIDITA = To_Date ('01-01-2400', 'DD-MM-YYYY') ,
     FLG_ESTINZIONE = '1'
 
@@ -105,7 +105,7 @@ from (
 	STG_AGENZIA_1.COD_CAB_COMUNE	COD_CAB_COMUNE,
 	STG_AGENZIA_1.COD_CIN_COMUNE	COD_CIN_COMUNE,
                  '1',
-		 PARSE_DATE('%d/%m/%Y', '${vars.dat_caricamento}') -1,
+		 PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}') -1,
                 to_date ('01-01-2400', 'mm-dd-yyyy'),
 	'I' IND_UPDATE
 	from	${ref("stg_agenzia")} /* stg */ STG_AGENZIA_1  INNER JOIN  ${ref("h_agenzia")} /* datavault */ H_AGENZIA_1

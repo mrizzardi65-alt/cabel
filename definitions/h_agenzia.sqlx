@@ -42,7 +42,7 @@ on	/* ODI_TEMP: UNIQUE_STEP_TAG */ (COD_AGENZIA)
 /* TODO: questo blocco PL/SQL va riscritto in SQL BigQuery standard */
 select
 	STG_AGENZIA.COD_AGENZIA	COD_AGENZIA,
-	PARSE_DATE('%d/%m/%Y', '${vars.dat_caricamento}')	DAT_CARICAMENTO,
+	PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}')	DAT_CARICAMENTO,
 	STG_AGENZIA.SOURCE	SOURCE,
 	'I' IND_UPDATE
 from	${ref("stg_agenzia")} /* stg */ STG_AGENZIA
