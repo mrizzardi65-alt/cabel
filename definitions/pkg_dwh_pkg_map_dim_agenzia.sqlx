@@ -1,0 +1,18 @@
+config {
+  type: "operations",
+  description: "Package ODI: Package che lancia lo scenario del mapping MAP_DIM_AGENZIA -SCEN_STATUS=VALID"
+}
+
+-- Package ODI: DWH_PKG_MAP_DIM_AGENZIA v001
+-- Sequenza step:
+--   [0] Refresh variabile (default): V_DAT_SCHED_TWS → step 1
+--   [1] Refresh variabile: V_DAT_SCHED_TWS → step 2
+--   [2] Refresh variabile: PA_RM_AMBIENTE → step 3
+--   [3] Refresh variabile: PA_RM_SUFFISSO → step 4
+--   [4] Set variabile: PA_RM_NOME_OGG = DATAWAREHOUSE_MAP_DIM_AGENZIA → step 5
+--   [5] Set variabile: PA_RM_TIPO_OGG = MAPPING → step 6
+--   [6] Refresh variabile: PA_RM_VERSION → step 7
+--   [7] Esegui scenario: Scenario DINAMICO versione DINAMICA → END
+
+-- In Dataform le dipendenze sono gestite tramite ref() nei file .sqlx dei mapping.
+-- Questo file è generato a scopo documentativo.

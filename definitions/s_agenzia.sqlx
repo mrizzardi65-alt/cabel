@@ -1,0 +1,137 @@
+config {
+  type: "incremental",
+  schema: "datavault",
+  description: "Mapping di alimentazione della tabella S_AGENZIA"
+  /* Parametri ODI: CABDV.V_DAT_CARICAMENTO */
+}
+
+pre_operations {
+  -- [delete previous check sum]
+delete from	/* ODI_INTERNAL: SNP_CHECK_TAB */
+where	SCHEMA_NAME	= '/* schema */'
+and	ORIGIN 		= '(49)GOV_DTV - DataVault.MAP_S_AGENZIA'
+and	ERR_TYPE 		= 'F'
+
+  -- [Drop flow table (I$)]
+drop table /* ODI_TEMP: UNIQUE_STEP_TAG */
+
+  -- [Create flow table (I$)]
+create table /* ODI_TEMP: UNIQUE_STEP_TAG */
+(
+	DESC_AGENZIA	STRING null,
+	COD_CAB	STRING null,
+	IDC_CHIUSA_OPERATIVA	STRING null,
+	DESC_SEDE_OPERATIVA	STRING null,
+	DESC_LOCALITA	STRING null,
+	SEQ_AGENZIA	INT64 null,
+	DAT_CARICAMENTO	DATE null,
+	DAT_INIZIO_VALIDITA	DATE null,
+	DAT_FINE_VALIDITA	DATE null,
+	SOURCE	STRING null,
+	FLG_CURRENT	STRING null,
+	COD_ABI	STRING null,
+	COD_PROVINCIA	STRING null,
+	COD_NAZIONE	STRING null,
+	COD_CIN	NUMERIC null,
+	DAT_CHIUSURA	DATE null,
+	FLG_ESTINZIONE	STRING null,
+	COD_CAB_COMUNE	STRING null,
+	COD_CIN_COMUNE	STRING null,
+	IND_UPDATE		CHAR(1)
+)
+NOLOGGING
+
+  -- [Analyze target table]
+/* TODO: questo blocco PL/SQL va riscritto in SQL BigQuery standard */
+/*Declare
+Begin
+  /* schema */.TABSTATS('/* ODI_EXPR */');
+End;*/
+
+  -- [Create index on PK]
+/* FLOW CONTROL CREATE THE INDEX ON I$TABLE */
+create index 	/* ODI_TEMP: UNIQUE_STEP_TAG_PK */
+on	/* ODI_TEMP: UNIQUE_STEP_TAG */ (SEQ_AGENZIA, DAT_INIZIO_VALIDITA)
+
+  -- [Drop Table Deleted Records]
+Drop Table `datavault.s_agenzia`_DR
+
+  -- [Update Table Deleted Records]
+Update `datavault.s_agenzia`_DR T
+Set FLG_CURRENT = 1,
+    DAT_INIZIO_VALIDITA = PARSE_DATE('%d/%m/%Y', '${vars.dat_caricamento}')-1,
+    DAT_FINE_VALIDITA = To_Date ('01-01-2400', 'DD-MM-YYYY') ,
+    FLG_ESTINZIONE = '1'
+
+  -- [Update surrogate keys]
+update /* ODI_TEMP: UNIQUE_STEP_TAG */
+set
+        FLG_CURRENT	= 1
+where 	IND_UPDATE = 'I'
+
+  -- [Drop Table Deleted Records 2]
+Drop Table `datavault.s_agenzia`_DR
+
+  -- [Analyze target table]
+/* TODO: questo blocco PL/SQL va riscritto in SQL BigQuery standard */
+/*Declare
+Begin
+  /* schema */.TABSTATS('/* ODI_EXPR */');
+End;*/
+
+}
+
+-- Scenario ODI: DATAVAULT_MAP_S_AGENZIA v001
+-- Variabili: CABDV.V_DAT_CARICAMENTO, CABDV.V_DAT_CONTABILE_TWS
+-- NOTA: verifica i commenti TODO prima di eseguire in produzione
+
+select *
+from (
+	select
+		STG_AGENZIA_1.DESC_AGENZIA	DESC_AGENZIA,
+	STG_AGENZIA_1.COD_CAB	COD_CAB,
+	STG_AGENZIA_1.COD_STATO	IDC_CHIUSA_OPERATIVA,
+	STG_AGENZIA_1.DESC_SEDE_OPERATIVA	DESC_SEDE_OPERATIVA,
+	STG_AGENZIA_1.DESC_LOCALITA	DESC_LOCALITA,
+	H_AGENZIA_1.SEQ_AGENZIA	SEQ_AGENZIA,
+	NULL	DAT_CARICAMENTO,
+	STG_AGENZIA_1.SOURCE	SOURCE,
+	STG_AGENZIA_1.COD_ABI	COD_ABI,
+	STG_AGENZIA_1.COD_PROVINCIA	COD_PROVINCIA,
+	STG_AGENZIA_1.COD_NAZIONE	COD_NAZIONE,
+	STG_AGENZIA_1.COD_CIN	COD_CIN,
+	STG_AGENZIA_1.DAT_CHIUSURA	DAT_CHIUSURA,
+	'0'	FLG_ESTINZIONE,
+	STG_AGENZIA_1.COD_CAB_COMUNE	COD_CAB_COMUNE,
+	STG_AGENZIA_1.COD_CIN_COMUNE	COD_CIN_COMUNE,
+                 '1',
+		 PARSE_DATE('%d/%m/%Y', '${vars.dat_caricamento}') -1,
+                to_date ('01-01-2400', 'mm-dd-yyyy'),
+	'I' IND_UPDATE
+	from	${ref("stg_agenzia")} /* stg */ STG_AGENZIA_1  INNER JOIN  ${ref("h_agenzia")} /* datavault */ H_AGENZIA_1
+    ON  STG_AGENZIA_1.COD_AGENZIA = H_AGENZIA_1.COD_AGENZIA
+	where	(1=1)
+) S
+where NOT EXISTS (
+	select 'x'
+	from	${ref("s_agenzia")} /* datavault */ T
+	where	T.SEQ_AGENZIA	= S.SEQ_AGENZIA
+	and	((S.DESC_AGENZIA = T.DESC_AGENZIA) or (S.DESC_AGENZIA IS NULL and T.DESC_AGENZIA IS NULL))
+		and	((S.COD_CAB = T.COD_CAB) or (S.COD_CAB IS NULL and T.COD_CAB IS NULL))
+		and	((S.IDC_CHIUSA_OPERATIVA = T.IDC_CHIUSA_OPERATIVA) or (S.IDC_CHIUSA_OPERATIVA IS NULL and T.IDC_CHIUSA_OPERATIVA IS NULL))
+		and	((S.DESC_SEDE_OPERATIVA = T.DESC_SEDE_OPERATIVA) or (S.DESC_SEDE_OPERATIVA IS NULL and T.DESC_SEDE_OPERATIVA IS NULL))
+		and	((S.DESC_LOCALITA = T.DESC_LOCALITA) or (S.DESC_LOCALITA IS NULL and T.DESC_LOCALITA IS NULL))
+		and	((S.DAT_CARICAMENTO = T.DAT_CARICAMENTO) or (S.DAT_CARICAMENTO IS NULL and T.DAT_CARICAMENTO IS NULL))
+		and	((S.SOURCE = T.SOURCE) or (S.SOURCE IS NULL and T.SOURCE IS NULL))
+		and	((S.COD_ABI = T.COD_ABI) or (S.COD_ABI IS NULL and T.COD_ABI IS NULL))
+		and	((S.COD_PROVINCIA = T.COD_PROVINCIA) or (S.COD_PROVINCIA IS NULL and T.COD_PROVINCIA IS NULL))
+		and	((S.COD_NAZIONE = T.COD_NAZIONE) or (S.COD_NAZIONE IS NULL and T.COD_NAZIONE IS NULL))
+		and	((S.COD_CIN = T.COD_CIN) or (S.COD_CIN IS NULL and T.COD_CIN IS NULL))
+		and	((S.DAT_CHIUSURA = T.DAT_CHIUSURA) or (S.DAT_CHIUSURA IS NULL and T.DAT_CHIUSURA IS NULL))
+		and	((S.FLG_ESTINZIONE = T.FLG_ESTINZIONE) or (S.FLG_ESTINZIONE IS NULL and T.FLG_ESTINZIONE IS NULL))
+		and	((S.COD_CAB_COMUNE = T.COD_CAB_COMUNE) or (S.COD_CAB_COMUNE IS NULL and T.COD_CAB_COMUNE IS NULL))
+		and	((S.COD_CIN_COMUNE = T.COD_CIN_COMUNE) or (S.COD_CIN_COMUNE IS NULL and T.COD_CIN_COMUNE IS NULL))
+          and	T.FLG_CURRENT	= 1
+        /* and	FLG_CURRENT	= 1
+	and	DAT_FINE_VALIDITA	= to_date ('01-01-2400', 'mm-dd-yyyy')*/
+)
