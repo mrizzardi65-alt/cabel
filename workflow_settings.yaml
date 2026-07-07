@@ -1,0 +1,7 @@
+defaultProject: ornate-crossbar-499808-h8
+defaultDataset: DATAVAULT
+defaultLocation: EU
+dataformCoreVersion: 3.0.52
+vars:
+  dat_caricamento: "01/01/2000"   # override a runtime: formato DD/MM/YYYY
+  dat_sched_tws: "20000101"       # override a runtime: formato YYYYMMDD

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "ornate-crossbar-499808-h8",
+  schema: "STAGING",
+  name: "MAF_TDIP00",
+  description: "Tabella sorgente AS400 - dipendenti/operatori"
+}

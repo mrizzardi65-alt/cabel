@@ -1,0 +1,93 @@
+config {
+  type: "incremental",
+  database: "ornate-crossbar-499808-h8",
+  schema: "DATAVAULT",
+  name: "S_AGENZIA",
+  description: "SATELLITE DataVault Agenzia - gestione SCD con logical delete",
+  uniqueKey: ["SEQ_AGENZIA", "DAT_INIZIO_VALIDITA"],
+  columns: {
+    DESC_AGENZIA:         "Descrizione agenzia",
+    COD_CAB:              "Codice CAB",
+    IDC_CHIUSA_OPERATIVA: "Indicatore chiusura operativa (COD_STATO da STG)",
+    DESC_SEDE_OPERATIVA:  "Descrizione sede operativa",
+    DESC_LOCALITA:        "Localita",
+    SEQ_AGENZIA:          "FK verso H_AGENZIA",
+    DAT_CARICAMENTO:      "Data caricamento",
+    DAT_INIZIO_VALIDITA:  "Data inizio validita record",
+    DAT_FINE_VALIDITA:    "Data fine validita (2400-01-01 = record corrente)",
+    SOURCE:               "Sistema sorgente",
+    FLG_CURRENT:          "1=record corrente, 0=storico",
+    COD_ABI:              "Codice ABI",
+    COD_PROVINCIA:        "Codice provincia",
+    COD_NAZIONE:          "Codice nazione",
+    COD_CIN:              "Codice CIN",
+    DAT_CHIUSURA:         "Data chiusura agenzia",
+    FLG_ESTINZIONE:       "Flag estinzione logica (1=estinta)",
+    COD_CAB_COMUNE:       "Codice CAB comune",
+    COD_CIN_COMUNE:       "Codice CIN comune"
+  }
+}
+
+-- ============================================================
+-- S_AGENZIA (SATELLITE)
+-- Origine ODI: MAP_S_AGENZIA (GOV_DTV - DataVault / 03_DATAVAULT)
+-- Logica ODI: IKM Oracle Slowly Changing Dimension for DataVault + Logical delete v2
+-- Inserisce solo record nuovi o modificati rispetto a quelli correnti
+-- Parametro runtime: dat_caricamento = ${dataform.projectConfig.vars.dat_caricamento}
+-- ============================================================
+
+WITH stg AS (
+  SELECT
+    STG.DESC_AGENZIA,
+    STG.COD_CAB,
+    STG.COD_STATO                                                                AS IDC_CHIUSA_OPERATIVA,
+    STG.DESC_SEDE_OPERATIVA,
+    STG.DESC_LOCALITA,
+    H.SEQ_AGENZIA,
+    NULL                                                                         AS DAT_CARICAMENTO,
+    STG.SOURCE,
+    STG.COD_ABI,
+    STG.COD_PROVINCIA,
+    STG.COD_NAZIONE,
+    CAST(STG.COD_CIN AS NUMERIC)                                                 AS COD_CIN,
+    STG.DAT_CHIUSURA,
+    '0'                                                                          AS FLG_ESTINZIONE,
+    STG.COD_CAB_COMUNE,
+    STG.COD_CIN_COMUNE,
+    '1'                                                                          AS FLG_CURRENT,
+    DATE_SUB(
+      PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}'),
+      INTERVAL 1 DAY
+    )                                                                            AS DAT_INIZIO_VALIDITA,
+    DATE '2400-01-01'                                                            AS DAT_FINE_VALIDITA
+  FROM ${ref("stg_agenzia")} STG
+  INNER JOIN ${ref("h_agenzia")} H
+    ON STG.COD_AGENZIA = H.COD_AGENZIA
+  WHERE STG.COD_AGENZIA IS NOT NULL
+),
+
+nuovi AS (
+  SELECT stg.*
+  FROM stg
+  ${ when(incremental(), `
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM ${self()} T
+    WHERE T.SEQ_AGENZIA = stg.SEQ_AGENZIA
+      AND (stg.DESC_AGENZIA        IS NOT DISTINCT FROM T.DESC_AGENZIA)
+      AND (stg.COD_CAB              IS NOT DISTINCT FROM T.COD_CAB)
+      AND (stg.IDC_CHIUSA_OPERATIVA IS NOT DISTINCT FROM T.IDC_CHIUSA_OPERATIVA)
+      AND (stg.DESC_SEDE_OPERATIVA  IS NOT DISTINCT FROM T.DESC_SEDE_OPERATIVA)
+      AND (stg.DESC_LOCALITA        IS NOT DISTINCT FROM T.DESC_LOCALITA)
+      AND (stg.COD_ABI              IS NOT DISTINCT FROM T.COD_ABI)
+      AND (stg.COD_PROVINCIA        IS NOT DISTINCT FROM T.COD_PROVINCIA)
+      AND (stg.COD_NAZIONE          IS NOT DISTINCT FROM T.COD_NAZIONE)
+      AND (stg.COD_CIN              IS NOT DISTINCT FROM T.COD_CIN)
+      AND (stg.DAT_CHIUSURA         IS NOT DISTINCT FROM T.DAT_CHIUSURA)
+      AND (stg.COD_CAB_COMUNE       IS NOT DISTINCT FROM T.COD_CAB_COMUNE)
+      AND (stg.COD_CIN_COMUNE       IS NOT DISTINCT FROM T.COD_CIN_COMUNE)
+      AND T.FLG_CURRENT = '1'
+  )`) }
+)
+
+SELECT * FROM nuovi

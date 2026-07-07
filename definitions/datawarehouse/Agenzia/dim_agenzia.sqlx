@@ -1,0 +1,91 @@
+config {
+  type: "incremental",
+  database: "ornate-crossbar-499808-h8",
+  schema: "DWH",
+  name: "DIM_AGENZIA",
+  description: "Dimensione Agenzia nel DataWarehouse - SCD Type 2 alimentata da H_AGENZIA + S_AGENZIA",
+  uniqueKey: ["COD_AGENZIA", "DAT_INIZIO_VALIDITA"],
+  columns: {
+    COD_AGENZIA:         "Codice business agenzia",
+    DESC_AGENZIA:        "Descrizione agenzia (UPPER)",
+    FLG_OPERATIVA:       "Flag operativita (0=chiusa/estinta, 1=operativa)",
+    DAT_CHIUSURA:        "Data chiusura agenzia",
+    COD_ABI:             "Codice ABI",
+    COD_CAB:             "Codice CAB",
+    COD_PROVINCIA:       "Codice provincia (UPPER)",
+    COD_NAZIONE:         "Codice nazione (UPPER)",
+    DESC_LOCALITA:       "Localita (UPPER)",
+    DESC_INDIRIZZO:      "Indirizzo/sede operativa (UPPER, da DESC_SEDE_OPERATIVA)",
+    COD_CIN:             "Codice CIN",
+    COD_CAB_COMUNE:      "Codice CAB comune",
+    COD_CIN_COMUNE:      "Codice CIN comune",
+    DAT_INIZIO_VALIDITA: "Data inizio validita SCD",
+    DAT_FINE_VALIDITA:   "Data fine validita SCD (2400-01-01 = record corrente)"
+  }
+}
+
+-- ============================================================
+-- DIM_AGENZIA (DataWarehouse)
+-- Origine ODI: MAP_DIM_AGENZIA (GOV_DWH - DataWareHouse / 01_DWH_ANAGRAFICA)
+-- Logica ODI: IKM Oracle Slowly Changing Dimension DWH
+--   - Join H_AGENZIA + S_AGENZIA filtrato sul record valido alla data di schedulazione
+--   - Inserisce solo record nuovi o modificati
+--   - F_GET_RACCORDO (funzione Oracle) sostituita con logica CASE inline
+-- Parametro runtime: dat_sched_tws = ${dataform.projectConfig.vars.dat_sched_tws}
+-- ============================================================
+
+WITH sorgente AS (
+  SELECT
+    H.COD_AGENZIA                                                              AS COD_AGENZIA,
+    UPPER(S.DESC_AGENZIA)                                                      AS DESC_AGENZIA,
+    CASE
+      WHEN S.FLG_ESTINZIONE = '1'            THEN '0'
+      WHEN S.IDC_CHIUSA_OPERATIVA IS NOT NULL THEN '0'
+      ELSE '1'
+    END                                                                        AS FLG_OPERATIVA,
+    S.DAT_CHIUSURA                                                             AS DAT_CHIUSURA,
+    S.COD_ABI                                                                  AS COD_ABI,
+    S.COD_CAB                                                                  AS COD_CAB,
+    UPPER(S.COD_PROVINCIA)                                                     AS COD_PROVINCIA,
+    UPPER(S.COD_NAZIONE)                                                       AS COD_NAZIONE,
+    UPPER(S.DESC_LOCALITA)                                                     AS DESC_LOCALITA,
+    UPPER(S.DESC_SEDE_OPERATIVA)                                               AS DESC_INDIRIZZO,
+    CAST(S.COD_CIN AS STRING)                                                  AS COD_CIN,
+    S.COD_CAB_COMUNE                                                           AS COD_CAB_COMUNE,
+    S.COD_CIN_COMUNE                                                           AS COD_CIN_COMUNE,
+    PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}')       AS DAT_INIZIO_VALIDITA,
+    DATE '2400-01-01'                                                          AS DAT_FINE_VALIDITA
+  FROM ${ref("h_agenzia")} H
+  INNER JOIN ${ref("s_agenzia")} S
+    ON H.SEQ_AGENZIA = S.SEQ_AGENZIA
+  WHERE
+    PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}')
+      BETWEEN S.DAT_INIZIO_VALIDITA AND S.DAT_FINE_VALIDITA
+),
+
+nuovi AS (
+  SELECT sorgente.*
+  FROM sorgente
+  ${ when(incremental(), `
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM ${self()} T
+    WHERE T.COD_AGENZIA = sorgente.COD_AGENZIA
+      AND (sorgente.DESC_AGENZIA   IS NOT DISTINCT FROM T.DESC_AGENZIA)
+      AND (sorgente.FLG_OPERATIVA  IS NOT DISTINCT FROM T.FLG_OPERATIVA)
+      AND (sorgente.DAT_CHIUSURA   IS NOT DISTINCT FROM T.DAT_CHIUSURA)
+      AND (sorgente.COD_ABI        IS NOT DISTINCT FROM T.COD_ABI)
+      AND (sorgente.COD_CAB        IS NOT DISTINCT FROM T.COD_CAB)
+      AND (sorgente.COD_PROVINCIA  IS NOT DISTINCT FROM T.COD_PROVINCIA)
+      AND (sorgente.COD_NAZIONE    IS NOT DISTINCT FROM T.COD_NAZIONE)
+      AND (sorgente.DESC_LOCALITA  IS NOT DISTINCT FROM T.DESC_LOCALITA)
+      AND (sorgente.DESC_INDIRIZZO IS NOT DISTINCT FROM T.DESC_INDIRIZZO)
+      AND (sorgente.COD_CIN        IS NOT DISTINCT FROM T.COD_CIN)
+      AND (sorgente.COD_CAB_COMUNE IS NOT DISTINCT FROM T.COD_CAB_COMUNE)
+      AND (sorgente.COD_CIN_COMUNE IS NOT DISTINCT FROM T.COD_CIN_COMUNE)
+      AND PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}')
+          BETWEEN T.DAT_INIZIO_VALIDITA AND T.DAT_FINE_VALIDITA
+  )`) }
+)
+
+SELECT * FROM nuovi

@@ -1,0 +1,102 @@
+config {
+  type: "table",
+  database: "ornate-crossbar-499808-h8",
+  schema: "DATAVAULT_STG",
+  name: "STG_AGENZIA",
+  description: "Staging agenzia - estrazione e trasformazione da sorgente AS400",
+  columns: {
+    COD_AGENZIA:         "Codice agenzia (CHIAVE pos 4-6)",
+    DESC_AGENZIA:        "Descrizione agenzia (CAMP71 pos 1-15)",
+    COD_CAB:             "Codice CAB (CAMP71 pos 16-20)",
+    COD_STATO:           "Stato operativo agenzia (CAMP71 pos 42)",
+    DESC_SEDE_OPERATIVA: "Descrizione sede operativa (NULL da sorgente)",
+    DESC_LOCALITA:       "Localita agenzia (CAMP71 pos 56-71 parte 1)",
+    COD_ABI:             "Codice ABI (CAMP71 pos 60-64)",
+    COD_PROVINCIA:       "Codice provincia (CAMP71 pos 56-71 parte regexp)",
+    COD_NAZIONE:         "Codice nazione (NULL da sorgente)",
+    COD_CIN:             "Codice CIN (CAMP71 pos 69)",
+    SOURCE:              "Sistema sorgente (costante: AS400)",
+    DAT_CHIUSURA:        "Data chiusura agenzia (NULL da sorgente)",
+    COD_CAB_COMUNE:      "Codice CAB comune (CABCOMUNE pos 1-5)",
+    COD_CIN_COMUNE:      "Codice CIN comune (CABCOMUNE pos 6)"
+  }
+}
+
+-- ============================================================
+-- STG_AGENZIA
+-- Origine ODI: MAP_STG_AGENZIA (GOV_DTV - DataVault / 02_STAGING)
+-- Logica: TRUNCATE + INSERT da AS400 via join con CONFIG_DATAVAULT_STG
+-- Sorgenti: FILTAB (AGE, ABI, OPE), MAF_TDIP00, CONFIG_DATAVAULT_STG
+-- Parametro runtime: dat_caricamento = ${dataform.projectConfig.vars.dat_caricamento}
+-- ============================================================
+
+SELECT
+  TRIM(SUBSTR(INLINE_VIEW_1.CHIAVE, 4, 3))                                      AS COD_AGENZIA,
+  TRIM(SUBSTR(INLINE_VIEW_1.CAMP71, 1, 15))                                     AS DESC_AGENZIA,
+  TRIM(SUBSTR(INLINE_VIEW_1.CAMP71, 16, 5))                                     AS COD_CAB,
+  TRIM(SUBSTR(INLINE_VIEW_1.CAMP71, 42, 1))                                     AS COD_STATO,
+  NULL                                                                           AS DESC_SEDE_OPERATIVA,
+  TRIM(REGEXP_SUBSTR(SUBSTR(INLINE_VIEW_1.CAMP71, 56, 16), '[^(]+',  1, 1))    AS DESC_LOCALITA,
+  TRIM(SUBSTR(INLINE_VIEW_1.CAMP71, 60, 5))                                     AS COD_ABI,
+  TRIM(REGEXP_SUBSTR(SUBSTR(INLINE_VIEW_1.CAMP71, 56, 16), '[^()]+', 1, 2))    AS COD_PROVINCIA,
+  NULL                                                                           AS COD_NAZIONE,
+  TRIM(SUBSTR(INLINE_VIEW_1.CAMP71, 69, 1))                                     AS COD_CIN,
+  'AS400'                                                                        AS SOURCE,
+  NULL                                                                           AS DAT_CHIUSURA,
+  TRIM(SUBSTR(INLINE_VIEW_1.CABCOMUNE, 1, 5))                                   AS COD_CAB_COMUNE,
+  TRIM(SUBSTR(INLINE_VIEW_1.CABCOMUNE, 6, 1))                                   AS COD_CIN_COMUNE
+
+FROM (
+  -- INLINE_VIEW_1: FILTAB_AGE + MAF_TDIP00 + CONFIG per AGE
+  SELECT
+    FILTAB_AGE.CHIAVE                             AS CHIAVE,
+    FILTAB_AGE.CAMP71                             AS CAMP71,
+    MAF_TDIP00.CODDIPOPE                          AS CODDIPOPE,
+    MAF_TDIP00.CABCOMUNE                          AS CABCOMUNE,
+    CONFIG_DATAVAULT_STG_AGE.NOME_PARAM           AS NOME_PARAM,
+    CONFIG_DATAVAULT_STG_AGE.CHIAVE_PARAM         AS CHIAVE_PARAM,
+    CONFIG_DATAVAULT_STG_AGE.TIP_PARAM            AS TIP_PARAM,
+    CONFIG_DATAVAULT_STG_AGE.DAT_INIZIO_VALIDITA  AS DAT_INIZIO_VALIDITA,
+    CONFIG_DATAVAULT_STG_AGE.DAT_FINE_VALIDITA    AS DAT_FINE_VALIDITA,
+    CONFIG_DATAVAULT_STG_AGE.VAL_SOURCE           AS VAL_SOURCE
+  FROM
+    ${ref("FILTAB")} FILTAB_AGE
+    LEFT OUTER JOIN ${ref("MAF_TDIP00")} MAF_TDIP00
+      ON SUBSTR(FILTAB_AGE.CHIAVE, 4, 3) = TRIM(MAF_TDIP00.CODDIPOPE)
+    INNER JOIN ${ref("CONFIG_DATAVAULT_STG")} CONFIG_DATAVAULT_STG_AGE
+      ON SUBSTR(FILTAB_AGE.CHIAVE, 1, 3) = CONFIG_DATAVAULT_STG_AGE.VAL_SOURCE
+  WHERE
+    PARSE_DATE('%d/%m/%Y', CONFIG_DATAVAULT_STG_AGE.DAT_INIZIO_VALIDITA)
+      <= PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}')
+    AND PARSE_DATE('%d/%m/%Y', CONFIG_DATAVAULT_STG_AGE.DAT_FINE_VALIDITA)
+      >= PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}')
+    AND CONFIG_DATAVAULT_STG_AGE.NOME_PARAM = 'AGE'
+) INLINE_VIEW_1
+
+LEFT OUTER JOIN (
+  -- INLINE_VIEW ABI
+  SELECT
+    FILTAB_ABI_1.CHIAVE   AS CHIAVE,
+    FILTAB_ABI_1.CAMP71   AS CAMP71
+  FROM
+    ${ref("FILTAB")} FILTAB_ABI_1
+    INNER JOIN ${ref("CONFIG_DATAVAULT_STG")} CONFIG_DATAVAULT_STG_ABI_1
+      ON SUBSTR(FILTAB_ABI_1.CHIAVE, 1, 3) = CONFIG_DATAVAULT_STG_ABI_1.VAL_SOURCE
+  WHERE
+    CONFIG_DATAVAULT_STG_ABI_1.NOME_PARAM = 'ABI'
+) INLINE_VIEW_ABI
+  ON INLINE_VIEW_1.CHIAVE = INLINE_VIEW_ABI.CHIAVE
+
+LEFT OUTER JOIN (
+  -- INLINE_VIEW OPE
+  SELECT
+    FILTAB_OPE_1.CHIAVE   AS CHIAVE,
+    FILTAB_OPE_1.CAMP71   AS CAMP71
+  FROM
+    ${ref("FILTAB")} FILTAB_OPE_1
+    INNER JOIN ${ref("CONFIG_DATAVAULT_STG")} CONFIG_DATAVAULT_STG_OPE_1
+      ON SUBSTR(FILTAB_OPE_1.CHIAVE, 1, 3) = CONFIG_DATAVAULT_STG_OPE_1.VAL_SOURCE
+  WHERE
+    CONFIG_DATAVAULT_STG_OPE_1.NOME_PARAM = 'OPE'
+) INLINE_VIEW_OPE
+  ON INLINE_VIEW_1.CHIAVE = INLINE_VIEW_OPE.CHIAVE

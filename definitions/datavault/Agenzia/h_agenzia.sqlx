@@ -1,0 +1,49 @@
+config {
+  type: "incremental",
+  database: "ornate-crossbar-499808-h8",
+  schema: "DATAVAULT",
+  name: "H_AGENZIA",
+  description: "HUB DataVault Agenzia - inserisce solo nuovi COD_AGENZIA non ancora presenti",
+  uniqueKey: ["COD_AGENZIA"],
+  columns: {
+    SEQ_AGENZIA:     "Chiave surrogata sequenziale (simulazione sequence Oracle)",
+    COD_AGENZIA:     "Chiave business agenzia",
+    DAT_CARICAMENTO: "Data di caricamento nel DataVault",
+    SOURCE:          "Sistema sorgente"
+  }
+}
+
+-- ============================================================
+-- H_AGENZIA (HUB)
+-- Origine ODI: MAP_H_AGENZIA (GOV_DTV - DataVault / 03_DATAVAULT)
+-- Logica ODI: Incremental Update PL/SQL for HUB/LINK
+--   - Inserisce solo i COD_AGENZIA non ancora presenti in H_AGENZIA
+--   - SEQ_AGENZIA in ODI era una SEQUENCE Oracle (DV_SEQ_AGENZIA)
+--   - In BigQuery simulata con ROW_NUMBER() + MAX(SEQ_AGENZIA) esistente
+-- Parametro runtime: dat_caricamento = ${dataform.projectConfig.vars.dat_caricamento}
+-- ============================================================
+
+WITH nuovi AS (
+  SELECT
+    STG.COD_AGENZIA,
+    PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}') AS DAT_CARICAMENTO,
+    STG.SOURCE
+  FROM ${ref("stg_agenzia")} STG
+  WHERE STG.COD_AGENZIA IS NOT NULL
+    ${ when(incremental(), `AND STG.COD_AGENZIA NOT IN (SELECT COD_AGENZIA FROM ${self()})`) }
+),
+
+max_seq AS (
+  ${ when(incremental(),
+    `SELECT COALESCE(MAX(SEQ_AGENZIA), 0) AS max_val FROM ${self()}`,
+    `SELECT 0 AS max_val`
+  ) }
+)
+
+SELECT
+  max_seq.max_val + ROW_NUMBER() OVER (ORDER BY nuovi.COD_AGENZIA) AS SEQ_AGENZIA,
+  nuovi.COD_AGENZIA,
+  nuovi.DAT_CARICAMENTO,
+  nuovi.SOURCE
+FROM nuovi
+CROSS JOIN max_seq
