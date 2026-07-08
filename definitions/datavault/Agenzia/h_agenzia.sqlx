@@ -28,7 +28,7 @@ WITH nuovi AS (
     STG.COD_AGENZIA,
     PARSE_DATE('%d/%m/%Y', '${dataform.projectConfig.vars.dat_caricamento}') AS DAT_CARICAMENTO,
     STG.SOURCE
-  FROM ${ref("stg_agenzia")} STG
+  FROM ${ref("STG_AGENZIA")} STG
   WHERE STG.COD_AGENZIA IS NOT NULL
     ${ when(incremental(), `AND STG.COD_AGENZIA NOT IN (SELECT COD_AGENZIA FROM ${self()})`) }
 ),

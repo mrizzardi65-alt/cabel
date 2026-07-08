@@ -60,8 +60,8 @@ WITH stg AS (
       INTERVAL 1 DAY
     )                                                                            AS DAT_INIZIO_VALIDITA,
     DATE '2400-01-01'                                                            AS DAT_FINE_VALIDITA
-  FROM ${ref("stg_agenzia")} STG
-  INNER JOIN ${ref("h_agenzia")} H
+  FROM ${ref("STG_AGENZIA")} STG
+  INNER JOIN ${ref("H_AGENZIA")} H
     ON STG.COD_AGENZIA = H.COD_AGENZIA
   WHERE STG.COD_AGENZIA IS NOT NULL
 ),

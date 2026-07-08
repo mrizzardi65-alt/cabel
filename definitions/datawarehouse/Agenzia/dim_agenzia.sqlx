@@ -55,8 +55,8 @@ WITH sorgente AS (
     S.COD_CIN_COMUNE                                                           AS COD_CIN_COMUNE,
     PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}')       AS DAT_INIZIO_VALIDITA,
     DATE '2400-01-01'                                                          AS DAT_FINE_VALIDITA
-  FROM ${ref("h_agenzia")} H
-  INNER JOIN ${ref("s_agenzia")} S
+  FROM ${ref("H_AGENZIA")} H
+  INNER JOIN ${ref("S_AGENZIA")} S
     ON H.SEQ_AGENZIA = S.SEQ_AGENZIA
   WHERE
     PARSE_DATE('%Y%m%d', '${dataform.projectConfig.vars.dat_sched_tws}')
